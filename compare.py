@@ -25,7 +25,7 @@ saver.restore(sess, save_path)
 
 net = MLP_RELU(opt_net)
 
-print "\nRunning optimizer comparison..."
+print("\nRunning optimizer comparison...")
 
 if tf.gfile.Exists(summaries_dir):
 	tf.gfile.DeleteRecursively(summaries_dir)
@@ -47,7 +47,7 @@ for i in range(net.batches):
 	summary,_ = sess.run([merged, net.sgd_train_step], feed_dict={net.x: batch_x, net.y_: batch_y})
 	sgd_writer.add_summary(summary,i)
 accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})
-print "SGD accuracy: %f" % accuracy
+print("SGD accuracy: %f" % accuracy)
 sgd_writer.close()
 
 # Adam
@@ -57,10 +57,10 @@ for i in range(net.batches):
 	summary,_ = sess.run([merged, net.adam_train_step], feed_dict={net.x: batch_x, net.y_: batch_y})
 	adam_writer.add_summary(summary,i)
 accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})
-print "Adam accuracy: %f" % accuracy
+print("Adam accuracy: %f" % accuracy)
 adam_writer.close()
 
-# GRU optimizer
+# RNN optimizer
 sess.run(net.init) # Reset parameters of the net to be trained
 rnn_state = np.zeros([net.num_params, net.opt_net.cell.state_size])
 
@@ -80,5 +80,5 @@ for i in range(net.batches):
 	opt_net_writer.add_summary(summary,i)
 	
 accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})
-print "Opt net accuracy: %f" % accuracy
+print("Opt net accuracy: %f" % accuracy)
 opt_net_writer.close()

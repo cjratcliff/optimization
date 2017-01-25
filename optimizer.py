@@ -6,8 +6,7 @@ import numpy as np
 import rnn
 import rnn_cell
 from nn_utils import weight_matrix, bias_vector, fc_layer, fc_layer3, inv_scale_grads
-from constants import rnn_size, num_rnn_layers, k, m, rnn_type, grad_scaling_method, \
-		episode_length, loss_noise, loss_asymmetry, seq_length
+from constants import *
 import snf
 from nn_utils import tf_print
 
@@ -31,7 +30,7 @@ class Optimizer(object):
 		# The scope allows these variables to be excluded from being reinitialized during the comparison phase
 		with tf.variable_scope("optimizer"):
 			if rnn_type == 'rnn':
-				cell = rnn_cell.BasicRNNCell(rnn_size)
+				cell = rnn_cell.BasicRNNCell(rnn_size, activation=tf.nn.elu)
 			elif rnn_type == 'gru':
 				cell = rnn_cell.GRUCell(rnn_size)
 			elif rnn_type == 'lstm':
@@ -48,8 +47,8 @@ class Optimizer(object):
 			
 			snf_loss = snf.calc_snf_loss_tf(point, self.hyperplanes, self.variances, self.weights)
 			snf_losses.append(snf_loss)
-			snf_grads = snf.calc_grads_tf(snf_loss,point)
-			snf_grads = tf.squeeze(snf_grads, [0])
+			self.snf_grads = snf.calc_grads_tf(snf_loss,point)
+			snf_grads = tf.squeeze(self.snf_grads, [0])
 			
 			snf_loss_ta = tf.TensorArray(dtype=tf.float32, size=seq_length)
 			update_ta = tf.TensorArray(dtype=tf.float32, size=seq_length)
@@ -66,11 +65,9 @@ class Optimizer(object):
 
 				# Final layer of the optimizer
 				# Cannot use fc_layer due to a 'must be from the same frame' error
-				d = np.sqrt(1.0)/np.sqrt(rnn_size+1) ### should be sqrt(2, 3 or 6?)
-				initializer = tf.random_uniform_initializer(-d, d)
-				W = tf.get_variable("W", [rnn_size,1], initializer=initializer)
-				
+
 				# No bias, linear activation function
+				W = tf.get_variable("W", [rnn_size,1])
 				update = tf.matmul(h,W)
 				update = tf.reshape(update, [m,1])
 				update = inv_scale_grads(update)
@@ -83,7 +80,7 @@ class Optimizer(object):
 				snf_loss_ta = snf_loss_ta.write(time, snf_loss)
 				update_ta = update_ta.write(time, update)
 				
-				snf_grads_out = snf.calc_grads_tf(snf_loss,point)
+				snf_grads_out = tf.stop_gradient(snf.calc_grads_tf(snf_loss,point))
 				snf_grads_out = tf.reshape(snf_grads_out,[m,1])
 				
 				time += 1
@@ -100,33 +97,17 @@ class Optimizer(object):
 			
 			# Total change in the SNF loss
 			# Improvement: 2 - 3 = -1 (small loss)
-			snf_loss_change = losses[seq_length - 1] - losses[0]
-			snf_loss_change = tf.maximum(snf_loss_change,loss_asymmetry*snf_loss_change) # Asymmetric loss
-			self.loss_change_sign = tf.sign(snf_loss_change)
-			
-			# Oscillation cost
-			overall_update = tf.zeros([m,1])
-			norm_sum = 0.0
-				
-			for i in range(seq_length):
-				overall_update += updates[i,:,:]
-				norm_sum += tf_norm(updates[i,:,:])
-				
-			osc_cost = norm_sum/tf_norm(overall_update)	# > 1
-			
-			self.total_loss = snf_loss_change*tf.pow(osc_cost,tf.sign(snf_loss_change))
+			self.loss = losses[seq_length - 1] - losses[0]
+			self.loss_change_sign = tf.sign(self.loss)
 			
 			#===# Model training #===#
-			#opt = tf.train.RMSPropOptimizer(0.01,momentum=0.5)
-			opt = tf.train.AdamOptimizer()
+			meta_opt = tf.train.AdamOptimizer()
 			vars = tf.trainable_variables()
 			
-			gvs = opt.compute_gradients(self.total_loss, vars)
-			
+			gvs = meta_opt.compute_gradients(self.loss, vars)
 			self.gvs = [(tf.clip_by_value(grad, -1.0, 1.0), var) for (grad, var) in gvs]
 
-			self.grads_input = [(tf.placeholder(tf.float32, shape=v.get_shape()), v) for (g,v) in gvs]
-			self.train_step = opt.apply_gradients(self.grads_input)
+			self.train_step = meta_opt.apply_gradients(self.gvs)
 			
 			#===# Comparison code #===#
 			self.input_grads = tf.placeholder(tf.float32, [1,None,1], 'input_grads') ### Remove first dimension?
@@ -143,6 +124,7 @@ class Optimizer(object):
 			
 			
 	# Update the parameters of another network (eg an MLP)
+	### Deprecate this - use variables instead
 	def update_params(self, vars, update):
 		total = 0
 		ret = []

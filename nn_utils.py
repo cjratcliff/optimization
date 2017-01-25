@@ -6,9 +6,14 @@ import tensorflow as tf
 from constants import grad_scaling_method
 
 
-def xavier_initializer(dims): ### rename?
-	d = np.sqrt(1.0)/np.sqrt(sum(dims))
+def xavier_initializer(dims):
+	d = np.sqrt(6.0)/np.sqrt(sum(dims))
 	return tf.random_uniform_initializer(minval=-d, maxval=d)
+	
+
+def identity_initializer(shape):
+	x = np.eye(shape[0],shape[1])
+	return tf.constant_initializer(x, dtype=tf.float32) 
 
 
 def weight_matrix(num_in, num_out):

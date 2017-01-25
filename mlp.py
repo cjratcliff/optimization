@@ -2,12 +2,13 @@ from __future__ import division
 
 import tensorflow as tf
 from constants import rnn_size, m
+from nn_utils import xavier_initializer
 
-class MLP:
+class SoftmaxNet:
 	def __init__(self, opt_net):
 		self.opt_net = opt_net
 		self.batch_size = 64
-		self.batches = 1000
+		self.iterations = 100
 		self.num_params = 7850
 
 		# Define architecture
@@ -16,10 +17,8 @@ class MLP:
 		
 		# The scope is used to identify the right gradients to optimize
 		with tf.variable_scope("mnist"):
-			self.W = tf.Variable(tf.truncated_normal(stddev=0.1, shape=[784,10]))
-			self.b = tf.Variable(tf.constant(0.1, shape=[10]))
-			
-		y = tf.nn.softmax(tf.matmul(self.x,self.W) + self.b)
+			y = tf.contrib.layers.fully_connected(inputs=self.x, num_outputs=10, activation_fn=tf.nn.softmax)
+
 		y = tf.clip_by_value(y, 1e-10, 1.0) # Prevent log(0) in the cross-entropy calculation
 		
 		correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(self.y_,1))
@@ -29,7 +28,7 @@ class MLP:
 		tf.scalar_summary('loss', self.loss)
 
 		sgd_optimizer = tf.train.GradientDescentOptimizer(0.1)
-		rmsprop_optimizer = tf.train.RMSPropOptimizer(0.001)
+		rmsprop_optimizer = tf.train.RMSPropOptimizer(0.001) ### fix
 		adam_optimizer = tf.train.AdamOptimizer()
 		
 		grad_var_pairs = sgd_optimizer.compute_gradients(self.loss)
@@ -53,10 +52,8 @@ class MLP:
 		self.update = tf.placeholder(tf.float32,[self.num_params,1], 'update')
 		self.opt_net_train_step = self.opt_net.update_params(self.trainable_variables, self.update)
 		
-		vars = [i for i in tf.all_variables() if not 'optimizer' in i.name]
+		vars = [i for i in tf.global_variables() if not 'optimizer' in i.name]
 		self.init = tf.initialize_variables(vars)
-		
-		#===# Model training #===#
 		
 		
 		

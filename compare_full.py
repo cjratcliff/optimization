@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 
-from mlp import MLP
+from mlp import SoftmaxNet
 from mlp_relu import MLP_RELU
 #from cnn import CNN
 #from lm import LM
@@ -12,11 +12,10 @@ from optimizer import Optimizer
 from constants import summaries_dir, save_path, seq_length
 
 """
-rm nohup.out; nohup python -u compare_full.py &
+python compare_full.py
 tensorboard --logdir=/tmp/logs ./ --host 0.0.0.0
-http://ec2-52-48-79-131.eu-west-1.compute.amazonaws.com:6006/
 """
-
+### compare.py no longer needed?
 runs = 1 ###
 
 sess = tf.Session()
@@ -26,37 +25,34 @@ opt_net = Optimizer()
 saver = tf.train.Saver(tf.trainable_variables())
 saver.restore(sess, save_path)
 
-net = MLP(opt_net)
+net = SoftmaxNet(opt_net)
 sess.run(net.init)
 
-print "\nRunning optimizer comparison..."
-results = np.zeros([net.batches,5])
+print("\nRunning optimizer comparison...")
+results = np.zeros([net.iterations,5])
 
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 def test_inbuilt_optimizer(opt_step, index):
 	for i in range(runs):
 		sess.run(net.init) # Reset parameters of net to be trained
-		for j in range(net.batches):
+		for j in range(net.iterations):
 			batch_x, batch_y = mnist.train.next_batch(net.batch_size)
 			train_loss,_ = sess.run([net.loss, opt_step], feed_dict={net.x: batch_x, net.y_: batch_y})
 			results[j,index] += train_loss
 			results[j,0] = j
-		#accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})	
-	return
+		accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})	
+	return accuracy
 	
-test_inbuilt_optimizer(net.sgd_train_step,1)
-print "SGD complete"
-test_inbuilt_optimizer(net.rmsprop_train_step,2)
-print "RMSProp complete"
-test_inbuilt_optimizer(net.adam_train_step,3)
-print "Adam complete"
+print("SGD: ", test_inbuilt_optimizer(net.sgd_train_step,1))
+print("RMSProp: ", test_inbuilt_optimizer(net.rmsprop_train_step,2))
+print("Adam: ", test_inbuilt_optimizer(net.adam_train_step,3))
 
 for i in range(runs):
 	sess.run(net.init) # Reset parameters of the net to be trained
 	rnn_state = np.zeros([net.num_params, net.opt_net.cell.state_size])
-	print i
-	for j in range(net.batches):
+
+	for j in range(net.iterations):
 		batch_x, batch_y = mnist.train.next_batch(net.batch_size)
 		
 		# Compute gradients
@@ -71,9 +67,8 @@ for i in range(runs):
 		# Update MLP parameters
 		sess.run([net.opt_net_train_step], feed_dict={net.update:update})
 		
-	#accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})
-	#print "Opt net accuracy: %f" % accuracy
-print "Opt net complete"
+	accuracy = sess.run(net.accuracy, feed_dict={net.x: mnist.test.images, net.y_: mnist.test.labels})
+	print("Opt net: %f" % accuracy)
 	
 results /= runs
 

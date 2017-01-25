@@ -9,7 +9,7 @@ class MLP_RELU:
 	def __init__(self, opt_net):
 		self.opt_net = opt_net
 		self.batch_size = 64
-		self.batches = 100
+		self.iterations = 30
 		self.num_params = 466442#tf.reduce_prod(tf.shape(grads)) ### calculate num_params automatically
 
 		# Define architecture
@@ -32,7 +32,7 @@ class MLP_RELU:
 		tf.scalar_summary('loss', self.loss)
 
 		sgd_optimizer = tf.train.GradientDescentOptimizer(0.1)
-		rmsprop_optimizer = tf.train.RMSPropOptimizer(0.001)
+		rmsprop_optimizer = tf.train.RMSPropOptimizer(0.001) ### fix
 		adam_optimizer = tf.train.AdamOptimizer()
 		
 		grad_var_pairs = sgd_optimizer.compute_gradients(self.loss)

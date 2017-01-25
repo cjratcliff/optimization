@@ -9,5 +9,6 @@
 *.ckpt.meta
 *.out
 *checkpoint
+/models/*
 MNIST_data/*
 /tests/MNIST_data/*

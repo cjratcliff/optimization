@@ -38,7 +38,7 @@ def calc_snf_loss_tf(point,hyperplanes,variances,weights):
 	#variances = tf.maximum(variances,1e-6) # Avoid NaN errors
 	# Calculate the distance of the point from each hyperplane
 	hyperplanes = tf.reshape(hyperplanes, [k,m,m])
-	hp_inv = tf.batch_matrix_inverse(hyperplanes) # [k,m,m]
+	hp_inv = tf.matrix_inverse(hyperplanes) # [k,m,m]
 	x = tf.ones((k,m,1))
 	a = tf.batch_matmul(hp_inv, x) # [k,m,1]
 	point = tf.reshape(point,[m,1])
